@@ -1,31 +1,46 @@
-# Streamlitライブラリをインポート
-import streamlit as st
+import cv2
+from pyzbar.pyzbar import decode
 
-# ページ設定（タブに表示されるタイトル、表示幅）
-st.set_page_config(page_title="タイトル", layout="wide")
+# カメラの設定（0はデフォルトのカメラを意味します）
+cap = cv2.VideoCapture(0)
 
-# タイトルを設定
-st.title('Streamlitのサンプルアプリ')
+while True:
+    # フレームを取得
+    ret, frame = cap.read()
 
-# テキスト入力ボックスを作成し、ユーザーからの入力を受け取る
-user_input = st.text_input('あなたの名前を入力してください')
+    if not ret:
+        print("カメラから画像を取得できませんでした")
+        break
 
-# ボタンを作成し、クリックされたらメッセージを表示
-if st.button('挨拶する'):
-    if user_input:  # 名前が入力されているかチェック
-        st.success(f'🌟 こんにちは、{user_input}さん! 🌟')  # メッセージをハイライト
-    else:
-        st.error('名前を入力してください。')  # エラーメッセージを表示
+    # バーコードをデコード
+    barcodes = decode(frame)
 
-# スライダーを作成し、値を選択
-number = st.slider('好きな数字（10進数）を選んでください', 0, 100)
+    # バーコードがあれば表示
+    for barcode in barcodes:
+        # バーコードのデータを取得
+        barcode_data = barcode.data.decode('utf-8')
+        barcode_type = barcode.type
 
-# 補足メッセージ
-st.caption("十字キー（左右）でも調整できます。")
+        # バーコードのデータをコンソールに表示
+        print(f"データ: {barcode_data} タイプ: {barcode_type}")
 
-# 選択した数字を表示
-st.write(f'あなたが選んだ数字は「{number}」です。')
+        # バーコードの位置を描画
+        rect_points = barcode.polygon
+        if len(rect_points) == 4:
+            pts = [tuple(point) for point in rect_points]
+            cv2.polylines(frame, [np.array(pts, dtype=np.int32)], isClosed=True, color=(0, 255, 0), thickness=2)
 
-# 選択した数値を2進数に変換
-binary_representation = bin(number)[2:]  # 'bin'関数で2進数に変換し、先頭の'0b'を取り除く
-st.info(f'🔢 10進数の「{number}」を2進数で表現すると「{binary_representation}」になります。 🔢')  # 2進数の表示をハイライト
+        # バーコードのデータをテキストで表示
+        cv2.putText(frame, f'{barcode_data} ({barcode_type})', (barcode.rect.left, barcode.rect.top - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+    # フレームを画面に表示
+    cv2.imshow("カメラの映像", frame)
+
+    # 'q'キーで終了
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# カメラとウィンドウを解放
+cap.release()
+cv2.destroyAllWindows()
